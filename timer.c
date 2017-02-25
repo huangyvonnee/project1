@@ -29,7 +29,7 @@ static bool too_many_loops (unsigned loops);
 static void busy_wait (int64_t loops);
 static void real_time_sleep (int64_t num, int32_t denom);
 static void real_time_delay (int64_t num, int32_t denom);
-struct list blocked_list;
+struct list blocked_list;     // declare our global list of blocked threads
 bool timer_priority(const struct list_elem *a, const struct list_elem *b, void *aux);
 
 /* Sets up the timer to interrupt TIMER_FREQ times per second,
@@ -39,7 +39,7 @@ timer_init (void)
 {
   pit_configure_channel (0, 2, TIMER_FREQ);
   intr_register_ext (0x20, timer_interrupt, "8254 Timer");
-  list_init(&blocked_list);           //intialize list of threads
+  list_init(&blocked_list);        //intialize global list of blocked threads
 }
 
 /* Calibrates loops_per_tick, used to implement brief delays. */
@@ -101,23 +101,15 @@ bool timer_priority(const struct list_elem *a, const struct list_elem *b, void *
 void
 timer_sleep (int64_t ticks) 
 {
-   //int64_t start = timer_ticks ();
-
   ASSERT (intr_get_level () == INTR_ON);
-         
-  //disable interrupts put it in list and sema down and enable int
-  //blocked_list of threads with each one running sema
+  /*Mohammad driving now*/
   struct thread *curr = thread_current();
   curr->ticks_t = ticks;
   if(ticks > 0) {
-   // list_push_back(&blocked_list, &curr->blocked_elem);
     list_insert_ordered(&blocked_list, &curr->blocked_elem,
                        (list_less_func *) &timer_priority, NULL);
-    // printf("%d priority: %d\n", curr->tid, curr->priority);
     sema_down(&curr->sema);
   }
-  // while (timer_elapsed (start) < ticks) 
-  //   thread_yield ();  
 }
 
 
@@ -198,9 +190,12 @@ timer_interrupt (struct intr_frame *args UNUSED)
   ticks++;
   thread_tick ();
   struct list_elem *e = NULL;
+
+  //Got for loop structure from list.h
   for (e = list_begin (&blocked_list); e != list_end (&blocked_list);
        e = list_next (e))
   {
+      //Yvonne driving now
       struct thread *f = list_entry (e, struct thread, blocked_elem);
       f->ticks_t--;
       if (f->ticks_t == 0) {

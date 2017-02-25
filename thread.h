@@ -96,17 +96,17 @@ struct thread
     char name[16];                      /* Name (for debugging purposes). */
     uint8_t *stack;                     /* Saved stack pointer. */
     int priority;                       /* Priority. */
-    int originalPriority;
+    // int originalPriority;
     struct list_elem allelem;           /* List element for all threads list. */
-    struct semaphore sema;
+    struct semaphore sema;              /* Semaphore */
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
-    int64_t ticks_t;
+    int64_t ticks_t;                    /* Ticks for timer */
     struct list_elem blocked_elem;
     struct list_elem sema_elem;
-    struct lock *wait_lock;             /* Lock that thread is waiting on */
-    struct list donor_list;             /* List of threads that will donate */
-    struct list_elem donor_elem;             /* List element for donor list */
+    // struct lock *wait_lock;             /* Lock that thread is waiting on */
+    // struct list donor_list;             /* List of threads that will donate */
+    // struct list_elem donor_elem;             /* List element for donor list */
     //int nice;
 
 #ifdef USERPROG

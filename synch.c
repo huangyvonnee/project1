@@ -51,6 +51,7 @@ sema_init (struct semaphore *sema, unsigned value)
   list_init (&sema->waiters);
 }
 
+//Pearl driving now
 bool sema_priority(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED)
 {
   struct thread *t1 = list_entry (a, struct thread, sema_elem);
@@ -77,7 +78,6 @@ sema_down (struct semaphore *sema)
   old_level = intr_disable ();
   while (sema->value <= 0) 
     {
-      // list_push_back (&sema->waiters, &thread_current ()->elem);
       list_insert_ordered(&sema->waiters, &thread_current()->sema_elem,
                          (list_less_func *) &sema_priority, NULL);
       thread_block ();
@@ -314,6 +314,7 @@ struct semaphore_elem
   };
 
 
+//Mohammad driving now
 bool cond_priority(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED)
 {
   struct semaphore_elem *se1 = list_entry (a, struct semaphore_elem, elem);

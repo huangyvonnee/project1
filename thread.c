@@ -142,6 +142,7 @@ thread_tick (void)
     intr_yield_on_return ();
 }
 
+//Pearl driving now
 bool comp_priority(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED)
 {
   struct thread *t1 = list_entry (a, struct thread, elem);
@@ -260,7 +261,6 @@ thread_unblock (struct thread *t)
 
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
-  // list_push_back (&ready_list, &t->elem);
   list_insert_ordered(&ready_list, &t->elem, (list_less_func *) &change_priority, NULL);
   t->status = THREAD_READY;
   intr_set_level (old_level);
@@ -332,7 +332,6 @@ thread_yield (void)
 
   old_level = intr_disable ();
   if (cur != idle_thread) 
-    // list_push_back (&ready_list, &cur->elem);
     list_insert_ordered(&ready_list, &cur->elem,
                        (list_less_func *) &comp_priority, NULL);
   cur->status = THREAD_READY;
@@ -358,6 +357,7 @@ thread_foreach (thread_action_func *func, void *aux)
 }
 
 /* Sets the current thread's priority to NEW_PRIORITY. */
+//Mohammad driving now
 void
 thread_set_priority (int new_priority) 
 {
@@ -372,10 +372,7 @@ thread_set_priority (int new_priority)
 int
 thread_get_priority (void) 
 {
-  // if(thread_current()->priority > thread_current()->donatedPriority)
-    return thread_current()->priority;
-  // else
-  //   return thread_current()->donatedPriority;
+  return thread_current()->priority;
 }
 
 /* Sets the current thread's nice value to NICE. */
@@ -526,6 +523,7 @@ alloc_frame (struct thread *t, size_t size)
    empty.  (If the running thread can continue running, then it
    will be in the run queue.)  If the run queue is empty, return
    idle_thread. */
+//Yvonne driving now
 static struct thread *
 next_thread_to_run (void) 
 {
