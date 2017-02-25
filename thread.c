@@ -67,6 +67,8 @@ static struct thread *next_thread_to_run (void);
 static void init_thread (struct thread *, const char *name, int priority);
 static bool is_thread (struct thread *) UNUSED;
 static void *alloc_frame (struct thread *, size_t size);
+static void print_list(struct list *list);
+bool comp_priority(const struct list_elem *a, const struct list_elem *b, void *aux);
 static void schedule (void);
 void thread_schedule_tail (struct thread *prev);
 static tid_t allocate_tid (void);
@@ -98,8 +100,8 @@ thread_init (void)
   init_thread (initial_thread, "main", PRI_DEFAULT);
   initial_thread->status = THREAD_RUNNING;
   initial_thread->tid = allocate_tid ();
-  sema_init(&initial_thread->sema, 1);
-}
+  //initial_thread->nice = NICE_DEFAULT;
+  }
 
 /* Starts preemptive thread scheduling by enabling interrupts.
    Also creates the idle thread. */
@@ -138,6 +140,22 @@ thread_tick (void)
   /* Enforce preemption. */
   if (++thread_ticks >= TIME_SLICE)
     intr_yield_on_return ();
+}
+
+bool comp_priority(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED)
+{
+  struct thread *t1 = list_entry (a, struct thread, elem);
+  struct thread *t2 = list_entry (b, struct thread, elem);
+
+  return t1->priority > t2->priority;
+}
+
+bool change_priority(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED)
+{
+  struct thread *t1 = list_entry (a, struct thread, elem);
+  struct thread *t2 = list_entry (b, struct thread, elem);
+
+  return t1->priority < t2->priority;
 }
 
 /* Prints thread statistics. */
@@ -183,7 +201,7 @@ thread_create (const char *name, int priority,
   /* Initialize thread. */
   init_thread (t, name, priority);
   tid = t->tid = allocate_tid ();
-
+  list_init (&(t->donor_list));
 
   /* Stack frame for kernel_thread(). */
   kf = alloc_frame (t, sizeof *kf);
@@ -199,9 +217,11 @@ thread_create (const char *name, int priority,
   sf = alloc_frame (t, sizeof *sf);
   sf->eip = switch_entry;
   sf->ebp = 0;
-
+  
   /* Add to run queue. */
   thread_unblock (t);
+  if(thread_current()->priority < t->priority)
+    thread_yield();
 
   return tid;
 }
@@ -240,7 +260,8 @@ thread_unblock (struct thread *t)
 
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
-  list_push_back (&ready_list, &t->elem);
+  // list_push_back (&ready_list, &t->elem);
+  list_insert_ordered(&ready_list, &t->elem, (list_less_func *) &change_priority, NULL);
   t->status = THREAD_READY;
   intr_set_level (old_level);
 }
@@ -311,7 +332,9 @@ thread_yield (void)
 
   old_level = intr_disable ();
   if (cur != idle_thread) 
-    list_push_back (&ready_list, &cur->elem);
+    // list_push_back (&ready_list, &cur->elem);
+    list_insert_ordered(&ready_list, &cur->elem,
+                       (list_less_func *) &comp_priority, NULL);
   cur->status = THREAD_READY;
   schedule ();
   intr_set_level (old_level);
@@ -339,19 +362,29 @@ void
 thread_set_priority (int new_priority) 
 {
   thread_current ()->priority = new_priority;
+  struct list_elem *e = list_begin(&ready_list);
+  struct thread *f = list_entry(e, struct thread, elem);
+  if(thread_current()->priority < f->priority)
+    thread_yield();
 }
 
 /* Returns the current thread's priority. */
 int
 thread_get_priority (void) 
 {
-  return thread_current ()->priority;
+  // if(thread_current()->priority > thread_current()->donatedPriority)
+    return thread_current()->priority;
+  // else
+  //   return thread_current()->donatedPriority;
 }
 
 /* Sets the current thread's nice value to NICE. */
 void
 thread_set_nice (int nice UNUSED) 
 {
+  // ASSERT (NICE_MIN <= nice && nice <= NICE_MAX);
+
+  // thread_current()->nice = nice;
   /* Not yet implemented. */
 }
 
@@ -359,8 +392,7 @@ thread_set_nice (int nice UNUSED)
 int
 thread_get_nice (void) 
 {
-  /* Not yet implemented. */
-  return 0;
+  // return thread_current ()->nice;
 }
 
 /* Returns 100 times the system load average. */
@@ -465,11 +497,14 @@ init_thread (struct thread *t, const char *name, int priority)
   strlcpy (t->name, name, sizeof t->name);
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
+  t->originalPriority = priority;
   t->magic = THREAD_MAGIC;
 
   old_level = intr_disable();
   list_push_back (&all_list, &t->allelem);
   intr_set_level(old_level);
+  sema_init(&t->sema, 0);
+
 }
 
 /* Allocates a SIZE-byte frame at the top of thread T's stack and
@@ -485,6 +520,7 @@ alloc_frame (struct thread *t, size_t size)
   return t->stack;
 }
 
+
 /* Chooses and returns the next thread to be scheduled.  Should
    return a thread from the run queue, unless the run queue is
    empty.  (If the running thread can continue running, then it
@@ -495,8 +531,10 @@ next_thread_to_run (void)
 {
   if (list_empty (&ready_list))
     return idle_thread;
-  else
+  else {
+    list_sort(&ready_list, (list_less_func *) &comp_priority, NULL);
     return list_entry (list_pop_front (&ready_list), struct thread, elem);
+  }
 }
 
 /* Completes a thread switch by activating the new thread's page
@@ -581,6 +619,8 @@ allocate_tid (void)
 
   return tid;
 }
+
+
 
 /* Offset of `stack' member within `struct thread'.
    Used by switch.S, which can't figure it out on its own. */

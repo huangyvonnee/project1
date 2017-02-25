@@ -30,6 +30,7 @@ static void busy_wait (int64_t loops);
 static void real_time_sleep (int64_t num, int32_t denom);
 static void real_time_delay (int64_t num, int32_t denom);
 struct list blocked_list;
+bool timer_priority(const struct list_elem *a, const struct list_elem *b, void *aux);
 
 /* Sets up the timer to interrupt TIMER_FREQ times per second,
    and registers the corresponding interrupt. */
@@ -39,7 +40,6 @@ timer_init (void)
   pit_configure_channel (0, 2, TIMER_FREQ);
   intr_register_ext (0x20, timer_interrupt, "8254 Timer");
   list_init(&blocked_list);           //intialize list of threads
-  printf("\nlist\n");
 }
 
 /* Calibrates loops_per_tick, used to implement brief delays. */
@@ -87,36 +87,39 @@ timer_elapsed (int64_t then)
   return timer_ticks () - then;
 }
 
+
+bool timer_priority(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED)
+{
+  struct thread *t1 = list_entry (a, struct thread, blocked_elem);
+  struct thread *t2 = list_entry (b, struct thread, blocked_elem);
+
+  return t1->priority < t2->priority;
+}
+
 /* Sleeps for approximately TICKS timer ticks.  Interrupts must
    be turned on. */
 void
 timer_sleep (int64_t ticks) 
 {
-  int64_t start = timer_ticks ();
+   //int64_t start = timer_ticks ();
 
   ASSERT (intr_get_level () == INTR_ON);
          
   //disable interrupts put it in list and sema down and enable int
   //blocked_list of threads with each one running sema
   struct thread *curr = thread_current();
-   printf("\ngot into timer sleep\n");
-  // printf("\n2\n");
-  list_push_back(&blocked_list, &curr->blocked_elem);         //adds thread to back of list
-   printf("\npush back worked\n");
-   curr->ticks_t = ticks;
-   printf("\nNUM TICKS: %d\n", curr->ticks_t);
-  // curr->ticksPassed = 0;
-  // printf("\n4\n");
-  sema_init(&curr->sema, 1);
-  printf("\nsema init worked\n");
-  sema_down(&curr->sema);
-  printf("\nsema down worked\n");
-  // printf("\n5\n");
+  curr->ticks_t = ticks;
+  if(ticks > 0) {
+   // list_push_back(&blocked_list, &curr->blocked_elem);
+    list_insert_ordered(&blocked_list, &curr->blocked_elem,
+                       (list_less_func *) &timer_priority, NULL);
+    // printf("%d priority: %d\n", curr->tid, curr->priority);
+    sema_down(&curr->sema);
+  }
   // while (timer_elapsed (start) < ticks) 
   //   thread_yield ();  
-  //sema_up(&thread_current()->sema);
-
 }
+
 
 /* Sleeps for approximately MS milliseconds.  Interrupts must be
    turned on. */
@@ -192,30 +195,19 @@ timer_print_stats (void)
 static void
 timer_interrupt (struct intr_frame *args UNUSED)
 {
-  //ASSERT (intr_get_level () == INTR_OFF);
   ticks++;
   thread_tick ();
   struct list_elem *e = NULL;
-  struct thread *curr = thread_current();
-  curr->ticks_t--;
-  if(curr->ticks_t==0){
-    sema_up(&curr->sema);
+  for (e = list_begin (&blocked_list); e != list_end (&blocked_list);
+       e = list_next (e))
+  {
+      struct thread *f = list_entry (e, struct thread, blocked_elem);
+      f->ticks_t--;
+      if (f->ticks_t == 0) {
+        sema_up(&f->sema);
+        e = list_remove(e)->prev;
+      }
   }
-
-  // printf("\ngot into interrupt handler\n");
-
-  // for (e = list_begin (&blocked_list); e != list_end (&blocked_list);
-  //      e = list_next (e))
-  // {
-  //     struct thread *f = list_entry (e, struct thread, blocked_elem);
-  //     f->ticks_t--;
-  //     // printf("\ndecremented ticks\n");
-  //     if (f->ticks_t == 0) {
-  //       printf("\nwake up\n");
-  //       sema_up(&f->sema);
-  //       list_remove(e);
-  //     }
-  // }
 
 }
 
